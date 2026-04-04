@@ -2,6 +2,8 @@ package com.workhub.backend.security;
 
 import com.workhub.backend.entity.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,32 +41,40 @@ public class JwtService {
                 .compact();
     }
 
-    /**
-     * Validates a JWT token by verifying:
-     * 1. HMAC signature integrity (detects tampering)
-     * 2. Expiration (rejects expired tokens via the exp claim)
-     * 3. Token format (rejects malformed or unsupported tokens)
-     *
-     * @return true only if all checks pass, false otherwise
-     */
-    public boolean validateToken(String token) {
+    public UUID extractUserId(String token) {
+        return UUID.fromString(parseClaims(token).getSubject());
+    }
+
+    public TokenValidationResult validateToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token);
-            return true;
-        } catch (Exception e) {
-            return false;
+            parseClaims(token);
+            return TokenValidationResult.success();
+        } catch (ExpiredJwtException ex) {
+            return TokenValidationResult.expiredToken();
+        } catch (JwtException | IllegalArgumentException ex) {
+            return TokenValidationResult.invalidToken();
         }
     }
 
-    public UUID extractUserId(String token) {
-        Claims claims = Jwts.parser()
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return UUID.fromString(claims.getSubject());
+    }
+
+    public record TokenValidationResult(boolean valid, String errorMessage) {
+        public static TokenValidationResult success() {
+            return new TokenValidationResult(true, null);
+        }
+
+        public static TokenValidationResult expiredToken() {
+            return new TokenValidationResult(false, "Token expired");
+        }
+
+        public static TokenValidationResult invalidToken() {
+            return new TokenValidationResult(false, "Invalid authentication token");
+        }
     }
 }

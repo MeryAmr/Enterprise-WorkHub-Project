@@ -1,0 +1,7 @@
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: com.workhub.UpdateMavenProjectPropertyJavaVersionExample
+displayName: Update Maven Java project properties example
+recipeList:
+  - org.openrewrite.maven.UpdateMavenProjectPropertyJavaVersion:
+      version: 25

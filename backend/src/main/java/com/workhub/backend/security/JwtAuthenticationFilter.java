@@ -34,8 +34,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
+            JwtService.TokenValidationResult validationResult = jwtService.validateToken(token);
 
-            if (jwtService.validateToken(token)) {
+            if (validationResult.valid()) {
                 UUID userId = jwtService.extractUserId(token);
 
                 UsernamePasswordAuthenticationToken authentication =
@@ -44,6 +45,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                request.setAttribute(JwtAuthenticationEntryPoint.AUTH_ERROR_MESSAGE, validationResult.errorMessage());
             }
         }
 

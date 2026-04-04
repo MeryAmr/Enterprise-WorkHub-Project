@@ -19,4 +19,16 @@ spring:
 
 jwt:
   secret: dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIHdvcmtodWIgand0
-  expiration: 86400000
+  expiration: 86400000 # 1 day in milliseconds
+
+app:
+  seed:
+    tenant:
+      name: Acme Corp
+      plan: FREE
+    admin:
+      email: admin@acme.com
+      password: password123
+    user:
+      email: user@acme.com
+      password: password123
