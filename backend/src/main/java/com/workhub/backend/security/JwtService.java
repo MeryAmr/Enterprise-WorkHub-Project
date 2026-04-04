@@ -45,6 +45,14 @@ public class JwtService {
         return UUID.fromString(parseClaims(token).getSubject());
     }
 
+    public String extractRole(String token) {
+        return parseClaims(token).get("role", String.class);
+    }
+
+    public UUID extractTenantId(String token) {
+        return UUID.fromString(parseClaims(token).get("tenantId", String.class));
+    }
+
     public TokenValidationResult validateToken(String token) {
         try {
             parseClaims(token);

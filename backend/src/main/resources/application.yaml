@@ -5,7 +5,7 @@ spring:
   application:
     name: workhub-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/workhub
+    url: jdbc:postgresql://localhost:5433/workhub
     username: workhub
     password: workhub
     driver-class-name: org.postgresql.Driver
