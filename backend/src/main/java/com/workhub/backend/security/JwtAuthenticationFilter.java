@@ -30,27 +30,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
+        try {
+            String authHeader = request.getHeader("Authorization");
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            JwtService.TokenValidationResult validationResult = jwtService.validateToken(token);
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                JwtService.TokenValidationResult validationResult = jwtService.validateToken(token);
 
-            if (validationResult.valid()) {
-                UUID userId = jwtService.extractUserId(token);
-                String role = jwtService.extractRole(token);
+                if (validationResult.valid()) {
+                    UUID userId = jwtService.extractUserId(token);
+                    UUID tenantId = jwtService.extractTenantId(token);
+                    String role = jwtService.extractRole(token);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userId, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
+                    // Only set tenant context if user belongs to an org
+                    if (tenantId != null) {
+                        TenantContext.setTenantId(tenantId);
+                    }
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                request.setAttribute(JwtAuthenticationEntryPoint.AUTH_ERROR_MESSAGE, validationResult.errorMessage());
+                    List<SimpleGrantedAuthority> authorities = role != null
+                            ? List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                            : List.of();
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userId, null, authorities);
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    request.setAttribute(JwtAuthenticationEntryPoint.AUTH_ERROR_MESSAGE, validationResult.errorMessage());
+                }
             }
-        }
 
-        filterChain.doFilter(request, response);
+            filterChain.doFilter(request, response);
+        } finally {
+            // Always clear tenant context to prevent leaking into pooled threads
+            TenantContext.clear();
+        }
     }
 }

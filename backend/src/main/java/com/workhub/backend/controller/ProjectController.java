@@ -2,6 +2,7 @@ package com.workhub.backend.controller;
 
 import com.workhub.backend.dto.CreateProjectRequest;
 import com.workhub.backend.dto.ProjectResponse;
+import com.workhub.backend.dto.UpdateProjectRequest;
 import com.workhub.backend.service.ProjectService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,21 +30,32 @@ public class ProjectController {
             @Valid @RequestBody CreateProjectRequest request,
             Authentication authentication) {
         UUID userId = (UUID) authentication.getPrincipal();
-        ProjectResponse response = projectService.createProject(userId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(projectService.createProject(userId, request));
     }
 
     @GetMapping
-    public ResponseEntity<List<ProjectResponse>> getProjects(Authentication authentication) {
-        UUID userId = (UUID) authentication.getPrincipal();
-        return ResponseEntity.ok(projectService.getProjects(userId));
+    public ResponseEntity<List<ProjectResponse>> getProjects() {
+        return ResponseEntity.ok(projectService.getProjects());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProjectResponse> getProject(
+    public ResponseEntity<ProjectResponse> getProject(@PathVariable UUID id) {
+        return ResponseEntity.ok(projectService.getProject(id));
+    }
+
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<ProjectResponse> updateProject(
             @PathVariable UUID id,
-            Authentication authentication) {
-        UUID userId = (UUID) authentication.getPrincipal();
-        return ResponseEntity.ok(projectService.getProject(userId, id));
+            @Valid @RequestBody UpdateProjectRequest request) {
+        return ResponseEntity.ok(projectService.updateProject(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<Void> deleteProject(@PathVariable UUID id) {
+        projectService.deleteProject(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -6,11 +6,12 @@ import com.workhub.backend.dto.UpdateTaskStatusRequest;
 import com.workhub.backend.entity.Project;
 import com.workhub.backend.entity.Task;
 import com.workhub.backend.entity.TaskStatus;
-import com.workhub.backend.entity.User;
 import com.workhub.backend.exception.ResourceNotFoundException;
 import com.workhub.backend.repository.ProjectRepository;
 import com.workhub.backend.repository.TaskRepository;
+import com.workhub.backend.repository.TenantRepository;
 import com.workhub.backend.repository.UserRepository;
+import com.workhub.backend.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +23,16 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
 
     public TaskService(TaskRepository taskRepository,
                        ProjectRepository projectRepository,
+                       TenantRepository tenantRepository,
                        UserRepository userRepository) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
+        this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
     }
 
@@ -44,10 +48,7 @@ public class TaskService {
      */
     @Transactional
     public TaskResponse createTask(UUID userId, UUID projectId, CreateTaskRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        UUID tenantId = user.getTenant().getId();
+        UUID tenantId = TenantContext.getTenantId();
 
         // Step 1: find existing project or auto-create one within this transaction
         Project project = projectRepository.findByIdAndTenant_Id(projectId, tenantId)
@@ -56,9 +57,9 @@ public class TaskService {
                             tenantId, "Auto-created project");
                     String name = "Auto-created project " + (count + 1);
                     Project autoCreated = Project.builder()
-                            .tenant(user.getTenant())
+                            .tenant(tenantRepository.getReferenceById(tenantId))
                             .name(name)
-                            .createdBy(user)
+                            .createdBy(userRepository.getReferenceById(userId))
                             .build();
                     return projectRepository.save(autoCreated); // flushed but not yet committed
                 });
@@ -70,24 +71,19 @@ public class TaskService {
 
         // Step 3: create the task
         Task task = Task.builder()
-                .tenant(user.getTenant())
+                .tenant(tenantRepository.getReferenceById(tenantId))
                 .project(project)
                 .title(request.getTitle())
                 .status(TaskStatus.TODO)
                 .build();
 
-        task = taskRepository.save(task);
-        return toResponse(task);
+        return toResponse(taskRepository.save(task));
     }
 
     @Transactional(readOnly = true)
-    public List<TaskResponse> getTasksForProject(UUID userId, UUID projectId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    public List<TaskResponse> getTasksForProject(UUID projectId) {
+        UUID tenantId = TenantContext.getTenantId();
 
-        UUID tenantId = user.getTenant().getId();
-
-        // Verify the project belongs to this tenant
         projectRepository.findByIdAndTenant_Id(projectId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
@@ -97,12 +93,24 @@ public class TaskService {
                 .toList();
     }
 
-    @Transactional
-    public TaskResponse updateTaskStatus(UUID userId, UUID taskId, UpdateTaskStatusRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    @Transactional(readOnly = true)
+    public TaskResponse getTask(UUID taskId) {
+        return taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+    }
 
-        Task task = taskRepository.findByIdAndTenant_Id(taskId, user.getTenant().getId())
+    @Transactional
+    public void deleteTask(UUID taskId) {
+        Task task = taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+
+        taskRepository.delete(task);
+    }
+
+    @Transactional
+    public TaskResponse updateTaskStatus(UUID taskId, UpdateTaskStatusRequest request) {
+        Task task = taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         task.setStatus(request.getStatus());

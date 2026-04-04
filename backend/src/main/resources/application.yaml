@@ -30,5 +30,8 @@ app:
       email: admin@acme.com
       password: password123
     user:
-      email: user@acme.com
+      email: alice@acme.com
+      password: password123
+    user2:
+      email: bob@acme.com
       password: password123

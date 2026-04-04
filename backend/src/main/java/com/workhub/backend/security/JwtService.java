@@ -30,15 +30,20 @@ public class JwtService {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(user.getId().toString())
                 .claim("email", user.getEmail())
-                .claim("tenantId", user.getTenant().getId().toString())
-                .claim("role", user.getRole().name())
                 .issuedAt(now)
-                .expiration(expiryDate)
-                .signWith(secretKey)
-                .compact();
+                .expiration(expiryDate);
+
+        if (user.getTenant() != null) {
+            builder.claim("tenantId", user.getTenant().getId().toString());
+        }
+        if (user.getRole() != null) {
+            builder.claim("role", user.getRole().name());
+        }
+
+        return builder.signWith(secretKey).compact();
     }
 
     public UUID extractUserId(String token) {
@@ -50,7 +55,8 @@ public class JwtService {
     }
 
     public UUID extractTenantId(String token) {
-        return UUID.fromString(parseClaims(token).get("tenantId", String.class));
+        String tenantId = parseClaims(token).get("tenantId", String.class);
+        return tenantId != null ? UUID.fromString(tenantId) : null;
     }
 
     public TokenValidationResult validateToken(String token) {

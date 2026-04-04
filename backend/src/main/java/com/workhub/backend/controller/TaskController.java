@@ -35,19 +35,26 @@ public class TaskController {
     }
 
     @GetMapping("/projects/{projectId}/tasks")
-    public ResponseEntity<List<TaskResponse>> getTasksForProject(
-            @PathVariable UUID projectId,
-            Authentication authentication) {
-        UUID userId = (UUID) authentication.getPrincipal();
-        return ResponseEntity.ok(taskService.getTasksForProject(userId, projectId));
+    public ResponseEntity<List<TaskResponse>> getTasksForProject(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(taskService.getTasksForProject(projectId));
+    }
+
+    @GetMapping("/tasks/{id}")
+    public ResponseEntity<TaskResponse> getTask(@PathVariable UUID id) {
+        return ResponseEntity.ok(taskService.getTask(id));
     }
 
     @PatchMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> updateTaskStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateTaskStatusRequest request,
-            Authentication authentication) {
-        UUID userId = (UUID) authentication.getPrincipal();
-        return ResponseEntity.ok(taskService.updateTaskStatus(userId, id, request));
+            @Valid @RequestBody UpdateTaskStatusRequest request) {
+        return ResponseEntity.ok(taskService.updateTaskStatus(id, request));
+    }
+
+    @DeleteMapping("/tasks/{id}")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<Void> deleteTask(@PathVariable UUID id) {
+        taskService.deleteTask(id);
+        return ResponseEntity.noContent().build();
     }
 }

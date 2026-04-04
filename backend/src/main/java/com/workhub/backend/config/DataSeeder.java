@@ -23,6 +23,8 @@ public class DataSeeder implements CommandLineRunner {
     private final String adminPassword;
     private final String userEmail;
     private final String userPassword;
+    private final String user2Email;
+    private final String user2Password;
 
     public DataSeeder(TenantRepository tenantRepository,
                       UserRepository userRepository,
@@ -32,7 +34,9 @@ public class DataSeeder implements CommandLineRunner {
                       @Value("${app.seed.admin.email}") String adminEmail,
                       @Value("${app.seed.admin.password}") String adminPassword,
                       @Value("${app.seed.user.email}") String userEmail,
-                      @Value("${app.seed.user.password}") String userPassword) {
+                      @Value("${app.seed.user.password}") String userPassword,
+                      @Value("${app.seed.user2.email}") String user2Email,
+                      @Value("${app.seed.user2.password}") String user2Password) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -42,6 +46,8 @@ public class DataSeeder implements CommandLineRunner {
         this.adminPassword = adminPassword;
         this.userEmail = userEmail;
         this.userPassword = userPassword;
+        this.user2Email = user2Email;
+        this.user2Password = user2Password;
     }
 
     @Override
@@ -70,6 +76,15 @@ public class DataSeeder implements CommandLineRunner {
                 User.builder()
                         .email(userEmail)
                         .passwordHash(passwordEncoder.encode(userPassword))
+                        .role(Role.TENANT_USER)
+                        .tenant(acme)
+                        .build()
+        );
+
+        userRepository.save(
+                User.builder()
+                        .email(user2Email)
+                        .passwordHash(passwordEncoder.encode(user2Password))
                         .role(Role.TENANT_USER)
                         .tenant(acme)
                         .build()
