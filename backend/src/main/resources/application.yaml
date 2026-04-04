@@ -1,3 +1,22 @@
+server:
+  port: 8080
+
 spring:
   application:
-    name: backend
+    name: workhub-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/workhub
+    username: workhub
+    password: workhub
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  secret: dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIHdvcmtodWIgand0
+  expiration: 86400000

@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: workhub-postgres
+    environment:
+      POSTGRES_DB: workhub
+      POSTGRES_USER: workhub
+      POSTGRES_PASSWORD: workhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - workhub-pgdata:/var/lib/postgresql/data
+
+volumes:
+  workhub-pgdata:
