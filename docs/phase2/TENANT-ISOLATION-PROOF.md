@@ -35,6 +35,14 @@ The seeder creates **two tenants**:
 
 All passwords: `password123`. Login at `POST /auth/login`.
 
+Evidence run:
+
+```text
+PROJ_B=25312e9e-2174-439f-b003-c9511b06a64d
+TASK_B=625a3569-4fd8-4dff-abfa-9fddcbf01e92
+GLOBEX_NAME=Globex Isolation Proof 1777928197
+```
+
 ```bash
 # Acme admin token
 JWT_A=$(curl -s -X POST localhost:8080/auth/login \
@@ -66,12 +74,22 @@ curl -i -H "Authorization: Bearer $JWT_A" \
 
 **Expected:** `HTTP/1.1 404 Not Found`. Body: `{"message":"Project not found"}`.
 
-**Evidence (paste actual response):**
+**Evidence:**
 
 ```
 HTTP/1.1 404
-...
-{"message":"Project not found"}
+X-Correlation-Id: bf259d09-f838-404c-a33a-8977cd11088e
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 04 May 2026 20:56:37 GMT
+
+{"status":404,"message":"Project not found","timestamp":"2026-05-04T20:56:37.974276328Z"}
 ```
 
 ## Test 2 — Cross-tenant update
@@ -87,12 +105,22 @@ curl -i -X PATCH -H "Authorization: Bearer $JWT_A" \
 
 **Expected:** `HTTP/1.1 404 Not Found`. Globex DB row is unchanged.
 
-**Evidence (paste actual response):**
+**Evidence:**
 
 ```
 HTTP/1.1 404
-...
-{"message":"Task not found"}
+X-Correlation-Id: 0364ce97-fb88-4049-aa74-016206b10558
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 04 May 2026 20:56:37 GMT
+
+{"status":404,"message":"Task not found","timestamp":"2026-05-04T20:56:37.993860977Z"}
 ```
 
 ## Test 3 — Cross-tenant list
@@ -106,14 +134,32 @@ curl -s -H "Authorization: Bearer $JWT_A" localhost:8080/projects | jq
 **Expected:** Globex Secret is absent from the list. Acme sees only its own
 projects (initially `[]` if no Acme projects yet).
 
-**Evidence (paste actual response):**
+**Evidence:**
 
-```
-[]
+```json
+{
+  "visibleProjectIds": [
+    "fe726a5d-18a8-4825-bf39-a14e6b83a652",
+    "3b5aedee-b4e6-40e6-8863-f22591b15cc9",
+    "53fd7c6d-80f8-45d2-b2a8-421737542643",
+    "dfad3bc9-dadb-4040-85e1-5e0754a7e51b",
+    "e439b76b-f710-40b0-bd5d-a6c20e22c0a9"
+  ],
+  "visibleProjectNames": [
+    "Phase 2 Demo Project",
+    "Phase 2 Demo Project",
+    "Phase 2 Demo Project",
+    "Phase 2 Demo Project",
+    "Full Check Acme Project"
+  ],
+  "leakedGlobexProjectId": false,
+  "leakedGlobexProjectName": false
+}
 ```
 
-Same for tasks and reports — every list endpoint goes through
-`findAllBy...Tenant_Id(TenantContext.getTenantId())`.
+Same for tenant-scoped task/report reads — every lookup goes through a
+tenant-filtered repository method such as `findByIdAndTenant_Id(...)`, and
+project/task list endpoints use `findAllBy...Tenant_Id(...)`.
 
 ## Why this works
 
