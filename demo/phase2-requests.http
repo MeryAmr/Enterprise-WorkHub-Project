@@ -1,0 +1,119 @@
+@baseUrl = http://localhost:8080
+@acmeEmail = admin@acme.com
+@globexEmail = admin@globex.com
+@aliceEmail = alice@acme.com
+@password = password123
+
+### Login as Acme admin
+# @name loginAcme
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{acmeEmail}}",
+  "password": "{{password}}"
+}
+
+### Login as Globex admin
+# @name loginGlobex
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{globexEmail}}",
+  "password": "{{password}}"
+}
+
+### Login as Acme normal user
+# @name loginAlice
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{aliceEmail}}",
+  "password": "{{password}}"
+}
+
+### Auth me
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+X-Correlation-Id: manual-rest-client
+
+### Missing token should return 401
+GET {{baseUrl}}/projects
+
+### Tenant user creating project should return 403
+POST {{baseUrl}}/projects
+Authorization: Bearer {{loginAlice.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "Should Fail"
+}
+
+### Acme admin creates project
+# @name createAcmeProject
+POST {{baseUrl}}/projects
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "Manual REST Client Project"
+}
+
+### Acme admin creates task
+# @name createAcmeTask
+POST {{baseUrl}}/projects/{{createAcmeProject.response.body.$.id}}/tasks
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "title": "Manual task"
+}
+
+### Tenant user updates task status
+PATCH {{baseUrl}}/tasks/{{createAcmeTask.response.body.$.id}}
+Authorization: Bearer {{loginAlice.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### Generate async report
+# @name generateReport
+POST {{baseUrl}}/projects/{{createAcmeProject.response.body.$.id}}/generate-report
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+X-Correlation-Id: report-manual
+
+### Poll report until COMPLETED
+GET {{baseUrl}}/reports/{{generateReport.response.body.$.reportId}}
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+
+### Globex admin cannot read Acme report, expect 404
+GET {{baseUrl}}/reports/{{generateReport.response.body.$.reportId}}
+Authorization: Bearer {{loginGlobex.response.body.$.token}}
+
+### Globex admin cannot read Acme project, expect 404
+GET {{baseUrl}}/projects/{{createAcmeProject.response.body.$.id}}
+Authorization: Bearer {{loginGlobex.response.body.$.token}}
+
+### Health is public
+GET {{baseUrl}}/actuator/health
+
+### Readiness is public
+GET {{baseUrl}}/actuator/health/readiness
+
+### Liveness is public
+GET {{baseUrl}}/actuator/health/liveness
+
+### Metrics without token should return 401
+GET {{baseUrl}}/actuator/metrics
+
+### Metrics with token should return 200
+GET {{baseUrl}}/actuator/metrics
+Authorization: Bearer {{loginAcme.response.body.$.token}}
+
+### Prometheus with token should return 200
+GET {{baseUrl}}/actuator/prometheus
+Authorization: Bearer {{loginAcme.response.body.$.token}}

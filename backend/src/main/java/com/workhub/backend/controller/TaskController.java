@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@PreAuthorize("hasAnyRole('TENANT_ADMIN','TENANT_USER')")
 public class TaskController {
 
     private final TaskService taskService;
