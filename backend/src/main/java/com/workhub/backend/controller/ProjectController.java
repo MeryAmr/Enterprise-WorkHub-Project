@@ -16,6 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/projects")
+@PreAuthorize("hasAnyRole('TENANT_ADMIN','TENANT_USER')")
 public class ProjectController {
 
     private final ProjectService projectService;
