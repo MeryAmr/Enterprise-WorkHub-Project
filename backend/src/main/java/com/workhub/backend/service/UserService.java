@@ -10,7 +10,6 @@ import com.workhub.backend.repository.TenantRepository;
 import com.workhub.backend.repository.UserRepository;
 import com.workhub.backend.security.TenantContext;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,7 +25,6 @@ public class UserService {
         this.tenantRepository = tenantRepository;
     }
 
-    @Transactional
     public UserResponse inviteUser(InviteUserRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
@@ -46,11 +44,11 @@ public class UserService {
 
         user.setTenant(tenant);
         user.setRole(Role.TENANT_USER);
+        userRepository.save(user);
 
         return toResponse(user);
     }
 
-    @Transactional
     public void kickUser(UUID targetUserId, UUID requestingUserId) {
         UUID tenantId = TenantContext.getTenantId();
 
@@ -67,9 +65,9 @@ public class UserService {
 
         target.setTenant(null);
         target.setRole(null);
+        userRepository.save(target);
     }
 
-    @Transactional(readOnly = true)
     public List<UserResponse> getOrganizationMembers() {
         return userRepository.findAllByTenant_Id(TenantContext.getTenantId())
                 .stream()

@@ -80,7 +80,6 @@ public class TaskService {
         return toResponse(taskRepository.save(task));
     }
 
-    @Transactional(readOnly = true)
     public List<TaskResponse> getTasksForProject(UUID projectId) {
         UUID tenantId = TenantContext.getTenantId();
 
@@ -93,14 +92,12 @@ public class TaskService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public TaskResponse getTask(UUID taskId) {
         return taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
     }
 
-    @Transactional
     public void deleteTask(UUID taskId) {
         Task task = taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
@@ -108,12 +105,12 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
-    @Transactional
     public TaskResponse updateTaskStatus(UUID taskId, UpdateTaskStatusRequest request) {
         Task task = taskRepository.findByIdAndTenant_Id(taskId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         task.setStatus(request.getStatus());
+        taskRepository.save(task);
         return toResponse(task);
     }
 
