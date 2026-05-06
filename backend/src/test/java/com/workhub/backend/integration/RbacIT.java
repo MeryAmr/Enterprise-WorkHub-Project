@@ -1,4 +1,4 @@
-package com.workhub.backend;
+package com.workhub.backend.integration;
 
 import com.workhub.backend.entity.Plan;
 import com.workhub.backend.entity.Role;
