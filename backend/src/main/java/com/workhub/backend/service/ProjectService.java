@@ -43,7 +43,6 @@ public class ProjectService {
         return toResponse(projectRepository.save(project));
     }
 
-    @Transactional(readOnly = true)
     public List<ProjectResponse> getProjects() {
         return projectRepository.findAllByTenant_Id(TenantContext.getTenantId())
                 .stream()
@@ -51,23 +50,21 @@ public class ProjectService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public ProjectResponse getProject(UUID projectId) {
         return projectRepository.findByIdAndTenant_Id(projectId, TenantContext.getTenantId())
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
-    @Transactional
     public ProjectResponse updateProject(UUID projectId, UpdateProjectRequest request) {
         Project project = projectRepository.findByIdAndTenant_Id(projectId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         project.setName(request.getName());
+        projectRepository.save(project);
         return toResponse(project);
     }
 
-    @Transactional
     public void deleteProject(UUID projectId) {
         Project project = projectRepository.findByIdAndTenant_Id(projectId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
