@@ -40,8 +40,44 @@ variable "db_username" {
   default     = "workhub"
 }
 
+variable "db_name" {
+  description = "Postgres database name."
+  type        = string
+  default     = "workhub"
+}
+
+variable "postgres_image" {
+  description = "Postgres container image for the local Kubernetes stack."
+  type        = string
+  default     = "postgres:16"
+}
+
+variable "postgres_storage" {
+  description = "Persistent volume size requested by the Postgres StatefulSet."
+  type        = string
+  default     = "1Gi"
+}
+
+variable "kafka_image" {
+  description = "Kafka container image for the local Kubernetes stack."
+  type        = string
+  default     = "apache/kafka:3.7.0"
+}
+
+variable "kafka_storage" {
+  description = "Persistent volume size requested by the Kafka StatefulSet."
+  type        = string
+  default     = "1Gi"
+}
+
+variable "kafka_cluster_id" {
+  description = "Static KRaft cluster ID used by the single-node local Kafka broker."
+  type        = string
+  default     = "4L6g3nShT-eMCtK--X86sw"
+}
+
 variable "db_password" {
-  description = "Postgres password injected into the backend Secret. Must match the value Postgres was started with (k8s/infra/postgres.yaml reads the same Secret)."
+  description = "Postgres password injected into the backend Secret and Terraform-managed Postgres StatefulSet."
   type        = string
   sensitive   = true
 }

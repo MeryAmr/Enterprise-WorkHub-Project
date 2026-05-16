@@ -8,15 +8,21 @@ import com.workhub.backend.repository.TenantRepository;
 import com.workhub.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
 
+    private static final long SEED_LOCK_ID = 940031L;
+
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
+    private final TransactionTemplate transactionTemplate;
     private final String tenantName;
     private final Plan tenantPlan;
     private final String adminEmail;
@@ -35,6 +41,8 @@ public class DataSeeder implements CommandLineRunner {
     public DataSeeder(TenantRepository tenantRepository,
                       UserRepository userRepository,
                       PasswordEncoder passwordEncoder,
+                      JdbcTemplate jdbcTemplate,
+                      TransactionTemplate transactionTemplate,
                       @Value("${app.seed.tenant.name}") String tenantName,
                       @Value("${app.seed.tenant.plan}") Plan tenantPlan,
                       @Value("${app.seed.admin.email}") String adminEmail,
@@ -52,6 +60,8 @@ public class DataSeeder implements CommandLineRunner {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
+        this.transactionTemplate = transactionTemplate;
         this.tenantName = tenantName;
         this.tenantPlan = tenantPlan;
         this.adminEmail = adminEmail;
@@ -70,67 +80,71 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.count() > 0) {
-            return;
-        }
+        transactionTemplate.executeWithoutResult(status -> {
+            jdbcTemplate.execute("select pg_advisory_xact_lock(" + SEED_LOCK_ID + ")");
 
-        Tenant acme = tenantRepository.save(
-                Tenant.builder()
-                        .name(tenantName)
-                        .plan(tenantPlan)
-                        .build()
-        );
+            if (userRepository.existsByEmail(adminEmail)) {
+                return;
+            }
 
-        userRepository.save(
-                User.builder()
-                        .email(adminEmail)
-                        .passwordHash(passwordEncoder.encode(adminPassword))
-                        .role(Role.TENANT_ADMIN)
-                        .tenant(acme)
-                        .build()
-        );
+            Tenant acme = tenantRepository.save(
+                    Tenant.builder()
+                            .name(tenantName)
+                            .plan(tenantPlan)
+                            .build()
+            );
 
-        userRepository.save(
-                User.builder()
-                        .email(userEmail)
-                        .passwordHash(passwordEncoder.encode(userPassword))
-                        .role(Role.TENANT_USER)
-                        .tenant(acme)
-                        .build()
-        );
+            userRepository.save(
+                    User.builder()
+                            .email(adminEmail)
+                            .passwordHash(passwordEncoder.encode(adminPassword))
+                            .role(Role.TENANT_ADMIN)
+                            .tenant(acme)
+                            .build()
+            );
 
-        userRepository.save(
-                User.builder()
-                        .email(user2Email)
-                        .passwordHash(passwordEncoder.encode(user2Password))
-                        .role(Role.TENANT_USER)
-                        .tenant(acme)
-                        .build()
-        );
+            userRepository.save(
+                    User.builder()
+                            .email(userEmail)
+                            .passwordHash(passwordEncoder.encode(userPassword))
+                            .role(Role.TENANT_USER)
+                            .tenant(acme)
+                            .build()
+            );
 
-        Tenant globex = tenantRepository.save(
-                Tenant.builder()
-                        .name(tenant2Name)
-                        .plan(tenant2Plan)
-                        .build()
-        );
+            userRepository.save(
+                    User.builder()
+                            .email(user2Email)
+                            .passwordHash(passwordEncoder.encode(user2Password))
+                            .role(Role.TENANT_USER)
+                            .tenant(acme)
+                            .build()
+            );
 
-        userRepository.save(
-                User.builder()
-                        .email(tenant2AdminEmail)
-                        .passwordHash(passwordEncoder.encode(tenant2AdminPassword))
-                        .role(Role.TENANT_ADMIN)
-                        .tenant(globex)
-                        .build()
-        );
+            Tenant globex = tenantRepository.save(
+                    Tenant.builder()
+                            .name(tenant2Name)
+                            .plan(tenant2Plan)
+                            .build()
+            );
 
-        userRepository.save(
-                User.builder()
-                        .email(tenant2UserEmail)
-                        .passwordHash(passwordEncoder.encode(tenant2UserPassword))
-                        .role(Role.TENANT_USER)
-                        .tenant(globex)
-                        .build()
-        );
+            userRepository.save(
+                    User.builder()
+                            .email(tenant2AdminEmail)
+                            .passwordHash(passwordEncoder.encode(tenant2AdminPassword))
+                            .role(Role.TENANT_ADMIN)
+                            .tenant(globex)
+                            .build()
+            );
+
+            userRepository.save(
+                    User.builder()
+                            .email(tenant2UserEmail)
+                            .passwordHash(passwordEncoder.encode(tenant2UserPassword))
+                            .role(Role.TENANT_USER)
+                            .tenant(globex)
+                            .build()
+            );
+        });
     }
 }

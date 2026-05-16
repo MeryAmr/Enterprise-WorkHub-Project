@@ -8,7 +8,7 @@ provisioned via Terraform (the graded IaC path).
 |------|---------|----------------|--------------------------|
 | Compose | Local dev | — | `docker-compose.yml` |
 | k8s/ + kind | Manifest correctness, probes | `kind create cluster` (manual) | `kubectl apply -k k8s/` |
-| Terraform | Track 2 IaC deliverable | `kind_cluster` Terraform resource | `kubernetes_deployment`, `kubernetes_service`, `kubernetes_config_map`, `kubernetes_secret` |
+| Terraform | Track 2 IaC deliverable | `kind_cluster` Terraform resource | Terraform-managed Postgres, Kafka, backend config, Deployment, Service |
 
 Across all three paths the backend reads its datasource and JWT config from env
 ([backend/src/main/resources/application.yaml](backend/src/main/resources/application.yaml)),
@@ -130,62 +130,84 @@ kube-proxy/CoreDNS can become healthy.
 
 ## Path 3 — Terraform (Track 2 IaC, grading section C)
 
-This is the graded IaC path. Terraform provisions the **kind cluster** plus the
-**backend application workload** (namespace, ConfigMap, Secret, Deployment with
-probes, NodePort Service).
+This is the graded IaC path. Terraform now owns the full local Kubernetes stack:
 
-**Out of scope for Terraform, by design**: Postgres and Kafka stay in
-`k8s/infra/` and are applied with `kubectl apply` after Terraform is done. See
-[terraform/README.md](terraform/README.md) for the rationale.
+- kind cluster
+- namespace
+- backend ConfigMap and Secret
+- Postgres headless Service and StatefulSet
+- Kafka headless Service and StatefulSet
+- backend Deployment with readiness/liveness probes
+- backend NodePort Service
 
-### Init + apply
+Terraform intentionally does **not** build container images. In enterprise
+delivery, CI builds/pushes an immutable image and Terraform deploys that image
+tag. For local kind, the equivalent is: create the cluster, build/load the local
+image, then run the full Terraform apply.
+
+### Local kind apply
 
 ```bash
 cd terraform
 
 # 1. Configure
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars — set db_password + jwt_secret
+# edit terraform.tfvars if needed
 
-# 2. Init (downloads tehcyx/kind + hashicorp/kubernetes providers)
+# 2. Init + validate
 terraform init
 terraform fmt -check
 terraform validate
 
-# 3. Plan + apply. Terraform creates the Deployment object but does not wait
-#    for rollout because the local image and stateful dependencies come next.
-terraform plan
-terraform apply
+# 3. Bootstrap only the cluster so kind can accept the local backend image.
+terraform apply -target=kind_cluster.workhub -auto-approve
+cd ..
 
-# 4. Load image + apply stateful infra (out-of-band, by design)
-docker build -t workhub-backend:dev ../backend
-kind load docker-image workhub-backend:dev --name "$(terraform output -raw cluster_name)"
+# 4. Build and load the backend image.
+docker build -t workhub-backend:dev ./backend
+kind load docker-image workhub-backend:dev --name workhub
 kubectl --context kind-workhub -n kube-system rollout status deployment/coredns --timeout=120s
-kubectl --context kind-workhub apply -k ../k8s/infra/
-kubectl --context kind-workhub -n workhub rollout status statefulset/postgres --timeout=180s
-kubectl --context kind-workhub -n workhub rollout status statefulset/kafka --timeout=180s
 
-# 5. Restart backend so it sees Postgres now that the StatefulSet is up
-kubectl --context kind-workhub -n workhub rollout restart deployment/backend
-kubectl --context kind-workhub -n workhub rollout status deployment/backend --timeout=180s
+# 5. Apply the complete Terraform stack. This waits for Postgres, Kafka,
+#    and the backend Deployment to become ready.
+cd terraform
+terraform apply -auto-approve
 
 # 6. Verify
-curl "$(terraform output -raw backend_host_url)/actuator/health"
+curl "$(terraform output -raw backend_host_url)/actuator/health/readiness"
 
 # 7. Teardown
-kubectl --context kind-workhub delete -f ../k8s/infra/ --ignore-not-found
-terraform destroy
+terraform destroy -auto-approve
 ```
 
-### Why Terraform is narrowed
+Expected verification:
 
-- **No drift**: Stateful resources (Postgres PVCs) mutate outside Terraform's
-  view; keeping them in YAML avoids `terraform refresh` spam.
-- **Tight blast radius**: `terraform destroy` removes the cluster and the backend
-  in one shot. PVC data on the host disk is reclaimed with the kind container.
-- **Image lifecycle is out-of-band anyway**: Even if Terraform managed Postgres,
-  it could not push images to kind; `docker build` + `kind load` is always a
-  manual step in a local cluster.
+```json
+{"status":"UP"}
+```
+
+### Registry-backed apply
+
+If the backend image has been pushed to a registry, the flow is simpler and more
+like a real environment:
+
+```bash
+cd terraform
+terraform init
+terraform validate
+terraform apply -var='backend_image=ghcr.io/<org>/workhub-backend:<sha>'
+```
+
+Do not apply `k8s/infra/` during the Terraform path; Postgres and Kafka are now
+Terraform-managed. The `k8s/` manifests remain for the raw Kubernetes rubric path.
+
+### Why this shape
+
+- Terraform apply now waits for workload readiness instead of merely creating
+  objects.
+- The image lifecycle stays outside Terraform, matching normal CI/CD practice.
+- Postgres and Kafka are included in Terraform for this local/course stack, so
+  the IaC path is self-contained after the image is available.
 
 ---
 
