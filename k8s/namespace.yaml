@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workhub
+  labels:
+    app.kubernetes.io/name: workhub
+    app.kubernetes.io/part-of: workhub-platform

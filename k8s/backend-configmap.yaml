@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: workhub
+  labels:
+    app: backend
+data:
+  SPRING_PROFILES_ACTIVE: "k8s"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.workhub.svc.cluster.local:5432/workhub"
+  SPRING_DATASOURCE_USERNAME: "workhub"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.workhub.svc.cluster.local:9092"

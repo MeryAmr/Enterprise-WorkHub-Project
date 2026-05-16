@@ -1,0 +1,9 @@
+target/
+bin/
+*.iml
+.idea/
+.vscode/
+.git/
+.gitignore
+HELP.md
+rewrite.yml

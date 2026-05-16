@@ -10,6 +10,11 @@ services:
       - "5433:5432"
     volumes:
       - workhub-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workhub -d workhub"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   kafka:
     image: apache/kafka:3.7.0
@@ -42,6 +47,27 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: workhub
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: workhub-backend:dev
+    container_name: workhub-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/workhub
+      SPRING_DATASOURCE_USERNAME: workhub
+      SPRING_DATASOURCE_PASSWORD: workhub
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET: dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIHdvcmtodWIgand0
+      SPRING_PROFILES_ACTIVE: docker
 
 volumes:
   workhub-pgdata:
