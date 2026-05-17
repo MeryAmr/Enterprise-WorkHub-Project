@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, phase2-saas-hardening]
+    branches: [main, kubernetes, kubernetes-simplified]
     tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [main, kubernetes, kubernetes-simplified]
 
 permissions:
   contents: read
