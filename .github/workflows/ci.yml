@@ -37,7 +37,7 @@ jobs:
       SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/workhub
       SPRING_DATASOURCE_USERNAME: workhub
       SPRING_DATASOURCE_PASSWORD: workhub
-      JWT_SECRET: ci-only-test-secret-not-for-production-use
+      JWT_SECRET: vTaFCmfdnnyQxTGj27pQAbXw9v2FbOgwp2YyLZ73s90=
       SPRING_PROFILES_ACTIVE: ci
 
     steps:
