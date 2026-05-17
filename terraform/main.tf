@@ -2,10 +2,6 @@ terraform {
   required_version = ">= 1.5.0"
 
   required_providers {
-    kind = {
-      source  = "tehcyx/kind"
-      version = "~> 0.11.0"
-    }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.38.0"
@@ -13,51 +9,15 @@ terraform {
   }
 }
 
-# 1. Local kind cluster — fully IaC-managed.
-resource "kind_cluster" "workhub" {
-  name            = var.cluster_name
-  wait_for_ready  = true
-  kubeconfig_path = pathexpand(var.kubeconfig_path)
-
-  kind_config {
-    kind        = "Cluster"
-    api_version = "kind.x-k8s.io/v1alpha4"
-
-    networking {
-      # Arch + Docker setups that use nf_tables can fail kube-proxy's legacy
-      # iptables rules, which leaves CoreDNS unable to reach the API Service.
-      kube_proxy_mode = "nftables"
-    }
-
-    node {
-      role = "control-plane"
-      kubeadm_config_patches = [
-        <<-EOT
-        kind: KubeProxyConfiguration
-        apiVersion: kubeproxy.config.k8s.io/v1alpha1
-        mode: nftables
-        EOT
-      ]
-
-      extra_port_mappings {
-        container_port = 30080
-        host_port      = 8080
-        listen_address = "0.0.0.0"
-        protocol       = "TCP"
-      }
-    }
-  }
-}
-
-# Kubernetes provider talks to the cluster the resource above just created.
+# Kubernetes provider targets an existing cluster/context. For local Phase 3,
+# create kind first with ../k8s/kind-config.yaml, then let Terraform own the
+# Kubernetes resources inside that cluster.
 provider "kubernetes" {
-  host                   = kind_cluster.workhub.endpoint
-  cluster_ca_certificate = kind_cluster.workhub.cluster_ca_certificate
-  client_certificate     = kind_cluster.workhub.client_certificate
-  client_key             = kind_cluster.workhub.client_key
+  config_path    = pathexpand(var.kubeconfig_path)
+  config_context = var.kube_context
 }
 
-# 2. Namespace.
+# 1. Namespace.
 resource "kubernetes_namespace" "workhub" {
   metadata {
     name = var.namespace
@@ -68,7 +28,7 @@ resource "kubernetes_namespace" "workhub" {
   }
 }
 
-# 3. Backend non-secret config (datasource URL/username, Kafka, profile).
+# 2. Backend non-secret config (datasource URL/username, Kafka, profile).
 resource "kubernetes_config_map" "backend" {
   metadata {
     name      = "backend-config"
@@ -84,7 +44,7 @@ resource "kubernetes_config_map" "backend" {
   }
 }
 
-# 4. Backend secrets (DB password + JWT).
+# 3. Backend secrets (DB password + JWT).
 resource "kubernetes_secret" "backend" {
   metadata {
     name      = "backend-secret"
@@ -100,7 +60,7 @@ resource "kubernetes_secret" "backend" {
   }
 }
 
-# 5. Postgres — stateful dependency owned by Terraform for the local stack.
+# 4. Postgres — stateful dependency owned by Terraform for the local stack.
 resource "kubernetes_service" "postgres" {
   metadata {
     name      = "postgres"
@@ -231,7 +191,7 @@ resource "kubernetes_stateful_set" "postgres" {
   }
 }
 
-# 6. Kafka — single-node KRaft broker for local/course delivery.
+# 5. Kafka — single-node KRaft broker for local/course delivery.
 resource "kubernetes_service" "kafka" {
   metadata {
     name      = "kafka"
@@ -405,7 +365,7 @@ resource "kubernetes_stateful_set" "kafka" {
   }
 }
 
-# 7. Backend Deployment — probes hit Spring Boot Actuator.
+# 6. Backend Deployment — probes hit Spring Boot Actuator.
 resource "kubernetes_deployment" "backend" {
 
   metadata {
@@ -519,7 +479,7 @@ resource "kubernetes_deployment" "backend" {
   }
 }
 
-# 6. Backend Service — NodePort matches kind extra_port_mappings.
+# 7. Backend Service — NodePort matches k8s/kind-config.yaml extraPortMappings.
 resource "kubernetes_service" "backend" {
   metadata {
     name      = "backend"

@@ -1,13 +1,13 @@
-variable "cluster_name" {
-  description = "Name of the local kind cluster."
-  type        = string
-  default     = "workhub"
-}
-
 variable "kubeconfig_path" {
-  description = "Where the kind provider writes the kubeconfig."
+  description = "Path to the kubeconfig for the target Kubernetes cluster."
   type        = string
   default     = "~/.kube/config"
+}
+
+variable "kube_context" {
+  description = "Kubeconfig context Terraform should use. For local kind, this is kind-workhub."
+  type        = string
+  default     = "kind-workhub"
 }
 
 variable "namespace" {
@@ -17,7 +17,7 @@ variable "namespace" {
 }
 
 variable "backend_image" {
-  description = "Container image for the backend. Must be loaded into kind via `kind load docker-image ... --name <cluster_name>` before apply."
+  description = "Container image for the backend. For local kind, build it and load it with `kind load docker-image ...` before apply."
   type        = string
   default     = "workhub-backend:dev"
 }

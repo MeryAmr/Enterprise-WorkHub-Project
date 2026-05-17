@@ -1,14 +1,14 @@
 # Deployment — Phase 3 (Week 14, Track 2)
 
 Three deploy paths, in increasing fidelity to production: local Compose, raw
-Kubernetes manifests on a kind cluster, and the same kind cluster fully
-provisioned via Terraform (the graded IaC path).
+Kubernetes manifests on a kind cluster, and Terraform-managed Kubernetes
+resources on that kind cluster (the graded IaC path).
 
 | Path | Purpose | Cluster origin | Backend workload origin |
 |------|---------|----------------|--------------------------|
 | Compose | Local dev | — | `docker-compose.yml` |
 | k8s/ + kind | Manifest correctness, probes | `kind create cluster` (manual) | `kubectl apply -k k8s/` |
-| Terraform | Track 2 IaC deliverable | `kind_cluster` Terraform resource | Terraform-managed Postgres, Kafka, backend config, Deployment, Service |
+| Terraform | Track 2 IaC deliverable | `kind create cluster --config k8s/kind-config.yaml` prerequisite | Terraform-managed Postgres, Kafka, backend config, Deployment, Service |
 
 Across all three paths the backend reads its datasource and JWT config from env
 ([backend/src/main/resources/application.yaml](backend/src/main/resources/application.yaml)),
@@ -130,9 +130,9 @@ kube-proxy/CoreDNS can become healthy.
 
 ## Path 3 — Terraform (Track 2 IaC, grading section C)
 
-This is the graded IaC path. Terraform now owns the full local Kubernetes stack:
+This is the graded IaC path. Terraform owns the Kubernetes resources inside an
+existing cluster:
 
-- kind cluster
 - namespace
 - backend ConfigMap and Secret
 - Postgres headless Service and StatefulSet
@@ -140,44 +140,38 @@ This is the graded IaC path. Terraform now owns the full local Kubernetes stack:
 - backend Deployment with readiness/liveness probes
 - backend NodePort Service
 
+The kind cluster itself is a local platform prerequisite. This matches the
+project brief: Track 2 requires Terraform to provision Kubernetes resources
+(namespace + at least deployment/service); cluster resources are optional.
+
 Terraform intentionally does **not** build container images. In enterprise
 delivery, CI builds/pushes an immutable image and Terraform deploys that image
-tag. For local kind, the equivalent is: create the cluster, build/load the local
-image, then run the full Terraform apply.
+tag. For local kind, build the image and load it into kind before the single
+Terraform apply.
 
 ### Local kind apply
 
 ```bash
-cd terraform
-
-# 1. Configure
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars if needed
-
-# 2. Init + validate
-terraform init
-terraform fmt -check
-terraform validate
-
-# 3. Bootstrap only the cluster so kind can accept the local backend image.
-terraform apply -target=kind_cluster.workhub -auto-approve
-cd ..
-
-# 4. Build and load the backend image.
-docker build -t workhub-backend:dev ./backend
-kind load docker-image workhub-backend:dev --name workhub
+# 1. Create the local Kubernetes target platform.
+kind create cluster --name workhub --config k8s/kind-config.yaml
 kubectl --context kind-workhub -n kube-system rollout status deployment/coredns --timeout=120s
 
-# 5. Apply the complete Terraform stack. This waits for Postgres, Kafka,
-#    and the backend Deployment to become ready.
-cd terraform
-terraform apply -auto-approve
+# 2. Build and make the backend image available to that cluster.
+docker build -t workhub-backend:dev ./backend
+kind load docker-image workhub-backend:dev --name workhub
 
-# 6. Verify
-curl "$(terraform output -raw backend_host_url)/actuator/health/readiness"
+# 3. Apply the complete Terraform-managed Kubernetes stack.
+terraform -chdir=terraform init
+terraform -chdir=terraform fmt -check
+terraform -chdir=terraform validate
+terraform -chdir=terraform apply -var-file=terraform.tfvars.example -auto-approve
 
-# 7. Teardown
-terraform destroy -auto-approve
+# 4. Verify.
+curl "$(terraform -chdir=terraform output -raw backend_host_url)/actuator/health/readiness"
+
+# 5. Teardown.
+terraform -chdir=terraform destroy -var-file=terraform.tfvars.example -auto-approve
+kind delete cluster --name workhub
 ```
 
 Expected verification:
@@ -188,14 +182,13 @@ Expected verification:
 
 ### Registry-backed apply
 
-If the backend image has been pushed to a registry, the flow is simpler and more
-like a real environment:
+If the backend image has been pushed to a registry, the flow is the same except
+there is no `kind load` step:
 
 ```bash
-cd terraform
-terraform init
-terraform validate
-terraform apply -var='backend_image=ghcr.io/<org>/workhub-backend:<sha>'
+terraform -chdir=terraform init
+terraform -chdir=terraform validate
+terraform -chdir=terraform apply   -var-file=terraform.tfvars.example   -var='backend_image=ghcr.io/<org>/workhub-backend:<sha>'
 ```
 
 Do not apply `k8s/infra/` during the Terraform path; Postgres and Kafka are now
@@ -203,13 +196,12 @@ Terraform-managed. The `k8s/` manifests remain for the raw Kubernetes rubric pat
 
 ### Why this shape
 
-- Terraform apply now waits for workload readiness instead of merely creating
-  objects.
+- Terraform apply is now a single normal apply after the cluster and image exist.
 - The image lifecycle stays outside Terraform, matching normal CI/CD practice.
-- Postgres and Kafka are included in Terraform for this local/course stack, so
-  the IaC path is self-contained after the image is available.
-
----
+- Terraform still satisfies Track 2 by provisioning Kubernetes resources, and it
+  waits for Postgres, Kafka, and backend readiness.
+- The local kind cluster remains reproducible through `k8s/kind-config.yaml`
+  without creating a Terraform/image-loading dependency cycle.
 
 ## CI/CD — GitHub Actions
 

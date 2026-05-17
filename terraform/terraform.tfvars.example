@@ -1,9 +1,10 @@
 # Copy to terraform.tfvars (gitignored) and edit before `terraform apply`.
 
-cluster_name  = "workhub"
-namespace     = "workhub"
-backend_image = "workhub-backend:dev"
-replicas      = 2
+kubeconfig_path = "~/.kube/config"
+kube_context    = "kind-workhub"
+namespace       = "workhub"
+backend_image   = "workhub-backend:dev"
+replicas        = 2
 
 # Cluster-internal DNS — change only if you renamed the namespace/services.
 db_url          = "jdbc:postgresql://postgres.workhub.svc.cluster.local:5432/workhub"
