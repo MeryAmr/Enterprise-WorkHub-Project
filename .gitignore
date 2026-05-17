@@ -26,3 +26,12 @@ replay_pid*
 .idea/
 .codex
 .vscode/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+terraform/*.tfvars
+!terraform/terraform.tfvars.example

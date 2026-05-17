@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars (gitignored) and edit before `terraform apply`.
+
+kubeconfig_path = "~/.kube/config"
+kube_context    = "kind-workhub"
+namespace       = "workhub"
+backend_image   = "workhub-backend:dev"
+replicas        = 2
+
+# Cluster-internal DNS — change only if you renamed the namespace/services.
+db_url          = "jdbc:postgresql://postgres.workhub.svc.cluster.local:5432/workhub"
+db_username     = "workhub"
+db_name         = "workhub"
+kafka_bootstrap = "kafka.workhub.svc.cluster.local:9092"
+
+postgres_image   = "postgres:16"
+postgres_storage = "1Gi"
+kafka_image      = "apache/kafka:3.7.0"
+kafka_storage    = "1Gi"
+kafka_cluster_id = "4L6g3nShT-eMCtK--X86sw"
+
+# Secrets — MUST be overridden in real environments.
+# These dev values match docker-compose.yml and the Terraform-managed Postgres StatefulSet.
+db_password = "workhub"
+jwt_secret  = "dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIHdvcmtodWIgand0"

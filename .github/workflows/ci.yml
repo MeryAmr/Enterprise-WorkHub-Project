@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "main"
+    tags: ["v*"]
+  pull_request:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test (Maven)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: workhub
+          POSTGRES_USER: workhub
+          POSTGRES_PASSWORD: workhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workhub -d workhub"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/workhub
+      SPRING_DATASOURCE_USERNAME: workhub
+      SPRING_DATASOURCE_PASSWORD: workhub
+      JWT_SECRET: vTaFCmfdnnyQxTGj27pQAbXw9v2FbOgwp2YyLZ73s90=
+      SPRING_PROFILES_ACTIVE: ci
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          check-latest: true
+          cache: maven
+
+      - name: Make mvnw executable
+        working-directory: backend
+        run: chmod +x mvnw
+
+      - name: Build + run tests
+        working-directory: backend
+        run: ./mvnw -B verify
+
+      - name: Upload surefire reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
+
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          load: true
+          tags: |
+            workhub-backend:${{ github.sha }}
+            workhub-backend:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  terraform-validate:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up latest Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: terraform fmt
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend)
+        working-directory: terraform
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        working-directory: terraform
+        run: terraform validate
