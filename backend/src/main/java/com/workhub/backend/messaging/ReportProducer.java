@@ -12,17 +12,15 @@ public class ReportProducer {
 
     private static final Logger log = LoggerFactory.getLogger(ReportProducer.class);
 
-    @SuppressWarnings("rawtypes")
-    private final KafkaTemplate kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public ReportProducer(@SuppressWarnings("rawtypes") KafkaTemplate kafkaTemplate) {
+    public ReportProducer(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
     /**
      * Publishes a report job. Key = tenantId so per-tenant ordering is preserved.
      */
-    @SuppressWarnings("unchecked")
     public void publish(ReportJobMessage message) {
         log.info("Publishing report job messageId={} tenantId={} reportId={}",
                 message.messageId(), message.tenantId(), message.reportId());
